@@ -6,6 +6,7 @@ import { createTransaction, deleteTransaction } from "../sync/mutations";
 import { formatRupees, toPaise } from "../utils/money";
 import { FilterBar } from "../components/FilterBar";
 import { FilterPeriod, rangeForPeriod } from "../utils/dateFilters";
+import { QuickAddPanel } from "../components/QuickAddPanel";
 
 export function WorkDetailPage() {
   const { workId } = useParams<{ workId: string }>();
@@ -58,7 +59,7 @@ export function WorkDetailPage() {
           {client && <Link to={`/clients/${client.id}`} className="back-link">← {client.name}</Link>}
           <h2>{work?.title || "…"}</h2>
         </div>
-        <button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "+ Add transaction"}</button>
+        <button onClick={() => setShowForm((s) => !s)}>{showForm ? "Cancel" : "+ Manual entry"}</button>
       </div>
 
       <div className="summary-cards">
@@ -94,6 +95,8 @@ export function WorkDetailPage() {
           <button type="submit">Save</button>
         </form>
       )}
+
+      {work && <QuickAddPanel clientId={work.clientId} workId={work.id} />}
 
       <FilterBar value={period} onChange={setPeriod} />
 

@@ -4,11 +4,15 @@ import { Link } from "react-router-dom";
 import { localDb } from "../db/localDb";
 import { createClient } from "../sync/mutations";
 
+const OFFICE_LEDGER_NAME = "Office / Firm Expenses";
+
 export function DashboardPage() {
-  const clients = useLiveQuery(
-    () => localDb.clients.filter((c) => !c.deletedAt).sortBy("name"),
-    []
-  );
+  const clients = useLiveQuery(async () => {
+    const rows = await localDb.clients.filter((c) => !c.deletedAt).sortBy("name");
+    return rows.sort((a, b) =>
+      a.name === OFFICE_LEDGER_NAME ? -1 : b.name === OFFICE_LEDGER_NAME ? 1 : 0
+    );
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");

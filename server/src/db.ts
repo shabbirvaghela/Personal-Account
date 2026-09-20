@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL,
   client_id TEXT NOT NULL,
-  work_id TEXT NOT NULL,
+  work_id TEXT,
   type TEXT NOT NULL CHECK (type IN ('IN','OUT')),
   amount_paise INTEGER NOT NULL,
   txn_date INTEGER NOT NULL,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api, setToken, clearToken } from "../api/client";
 import { syncEngine } from "../sync/syncEngine";
+import { seedOfficeLedger } from "../sync/mutations";
 
 interface User {
   id: string;
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));
     setUser(res.user);
     syncEngine.start();
+    await seedOfficeLedger();
   }
 
   function logout() {

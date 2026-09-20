@@ -31,7 +31,7 @@ export interface Work {
 export interface Transaction {
   id: string;
   clientId: string;
-  workId: string;
+  workId?: string | null;
   type: "IN" | "OUT";
   amountPaise: number;
   txnDate: number;

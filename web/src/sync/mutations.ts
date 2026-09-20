@@ -20,6 +20,10 @@ async function enqueue(entity: "client" | "work" | "transaction", entityId: stri
   syncEngine.kick();
 }
 
+export async function seedOfficeLedger(): Promise<void> {
+  await createClient({ name: "Office / Firm Expenses" });
+}
+
 export async function createClient(input: { name: string; phone?: string; address?: string; gstin?: string }): Promise<Client> {
   const id = uuid();
   const ts = now();
@@ -50,7 +54,7 @@ export async function createWork(input: { clientId: string; title: string; agree
 
 export async function createTransaction(input: {
   clientId: string;
-  workId: string;
+  workId?: string | null;
   type: "IN" | "OUT";
   amountPaise: number;
   txnDate: number;
@@ -59,10 +63,56 @@ export async function createTransaction(input: {
 }): Promise<Transaction> {
   const id = uuid();
   const ts = now();
-  const txn: Transaction = { id, ...input, version: 1, createdAt: ts, updatedAt: ts, syncStatus: "pending" };
+  const payload = { ...input, workId: input.workId ?? null };
+  const txn: Transaction = { id, ...payload, version: 1, createdAt: ts, updatedAt: ts, syncStatus: "pending" };
   await localDb.transactions.put(txn);
-  await enqueue("transaction", id, "create", input);
+  await enqueue("transaction", id, "create", payload);
   return txn;
+}
+
+export async function createTransactionsBatch(
+  inputs: Array<{
+    clientId: string;
+    workId?: string | null;
+    type: "IN" | "OUT";
+    amountPaise: number;
+    txnDate: number;
+    mode: "cash" | "upi" | "bank" | "cheque";
+    note?: string;
+  }>
+): Promise<Transaction[]> {
+  const ts = now();
+  const txns: Transaction[] = inputs.map((input) => ({
+    id: uuid(),
+    ...input,
+    workId: input.workId ?? null,
+    version: 1,
+    createdAt: ts,
+    updatedAt: ts,
+    syncStatus: "pending",
+  }));
+  await localDb.transactions.bulkPut(txns);
+  for (const txn of txns) {
+    await localDb.outbox.put({
+      opId: uuid(),
+      entity: "transaction",
+      entityId: txn.id,
+      op: "create",
+      payload: {
+        clientId: txn.clientId,
+        workId: txn.workId,
+        type: txn.type,
+        amountPaise: txn.amountPaise,
+        txnDate: txn.txnDate,
+        mode: txn.mode,
+        note: txn.note,
+      },
+      attempts: 0,
+      createdAt: ts,
+    });
+  }
+  syncEngine.kick();
+  return txns;
 }
 
 export async function deleteTransaction(id: string) {
