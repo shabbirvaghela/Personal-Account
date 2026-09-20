@@ -14,6 +14,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -52,6 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await seedOfficeLedger();
   }
 
+  async function loginWithGoogle(credential: string) {
+    const res = await api.loginWithGoogle(credential);
+    setToken(res.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+    setUser(res.user);
+    syncEngine.start();
+    if (res.isNewUser) await seedOfficeLedger();
+  }
+
   function logout() {
     clearToken();
     localStorage.removeItem(USER_KEY);
@@ -59,7 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

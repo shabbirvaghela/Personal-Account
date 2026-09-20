@@ -1,9 +1,10 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 export function LoginPage() {
-  const { login, register } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -11,6 +12,22 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const onGoogleCredential = useCallback(
+    async (credential: string) => {
+      setError(null);
+      setBusy(true);
+      try {
+        await loginWithGoogle(credential);
+        navigate("/");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Google sign-in failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loginWithGoogle, navigate]
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -65,6 +82,7 @@ export function LoginPage() {
         <button className="link-btn" onClick={() => setMode(mode === "login" ? "register" : "login")}>
           {mode === "login" ? "New here? Create an account" : "Already have an account? Log in"}
         </button>
+        <GoogleSignInButton onCredential={onGoogleCredential} />
       </div>
     </div>
   );

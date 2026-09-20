@@ -45,6 +45,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  loginWithGoogle: (credential: string) =>
+    request<{ token: string; user: { id: string; name: string; email: string }; isNewUser: boolean }>(
+      "/auth/google",
+      { method: "POST", body: JSON.stringify({ credential }) }
+    ),
   push: (ops: unknown[]) =>
     request<{ results: Record<string, { status: string; version?: number; reason?: string }> }>("/sync/push", {
       method: "POST",

@@ -5,6 +5,8 @@ import { DashboardPage } from "./pages/Dashboard";
 import { ClientDetailPage } from "./pages/ClientDetail";
 import { WorkDetailPage } from "./pages/WorkDetail";
 import { DuesPage } from "./pages/Dues";
+import { PetrolExpensePage } from "./pages/PetrolExpense";
+import { SettingsPage } from "./pages/Settings";
 import { SyncStatusBadge } from "./components/SyncStatusBadge";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -16,6 +18,8 @@ function Shell({ children }: { children: React.ReactNode }) {
         <nav>
           <NavLink to="/" end>Clients</NavLink>
           <NavLink to="/dues">Dues</NavLink>
+          <NavLink to="/petrol">Petrol</NavLink>
+          <NavLink to="/settings">Settings</NavLink>
         </nav>
         <div className="topbar-right">
           <SyncStatusBadge />
@@ -38,6 +42,8 @@ function PrivateRoutes() {
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
         <Route path="/works/:workId" element={<WorkDetailPage />} />
         <Route path="/dues" element={<DuesPage />} />
+        <Route path="/petrol" element={<PetrolExpensePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>
