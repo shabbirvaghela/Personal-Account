@@ -26,10 +26,21 @@ the Fly.io + Cloudflare Pages steps below (~10 more commands, one-time).
 ## Permanent deployment
 
 Two pieces to deploy: the API (`server/`, needs a persistent disk for its SQLite file)
-and the PWA (`web/`, static files). Recommended: **Fly.io** for the API (free allowance
-includes a persistent volume) and **Cloudflare Pages** for the frontend (free, global CDN,
-auto SSL). Render is a fine alternative for the API but its free tier's disk is *not*
-persistent — every redeploy wipes your data — so it's only listed as a fallback below.
+and the PWA (`web/`, static files). Both are free.
+
+**Why not put the whole thing on Vercel?** Vercel's Node hosting is serverless functions —
+each request can run on a fresh instance with a wiped filesystem, so a SQLite file written
+there doesn't reliably survive between requests. Vercel is genuinely great for the frontend
+(static Vite build, free, instant global CDN) — just not for this backend as written. The
+fix that keeps it all on Vercel would be swapping SQLite for a hosted Postgres (e.g. free
+tier on Neon or Supabase) so the backend has no local file to lose; that's a real option
+later, but it's a code change, not just a deploy setting, so it's not in this file yet — say
+the word if you want that instead of Fly.io.
+
+Recommended for now: **Fly.io** for the API (free allowance includes a persistent volume)
+and **Vercel or Cloudflare Pages** for the frontend (free, global CDN, auto SSL). Render is a
+fine alternative for the API but its free tier's disk is *not* persistent — every redeploy
+wipes your data — so it's only listed as a fallback below.
 
 ## 1. Backend on Fly.io
 
@@ -62,7 +73,29 @@ Your API is now live at `https://<your-app-name>.fly.dev`. Verify:
 curl https://<your-app-name>.fly.dev/health
 ```
 
-## 2. Frontend on Cloudflare Pages
+## 2. Frontend — Vercel (or Cloudflare Pages, either works)
+
+### Option A: Vercel
+
+```bash
+cd web
+npx vercel login        # opens browser, free account
+npx vercel               # first run: link/create project, accept Vite defaults
+                          # (build command `npm run build`, output dir `dist`)
+npx vercel env add VITE_API_BASE production
+                          # paste: https://<your-app-name>.fly.dev
+npx vercel --prod         # rebuild so the env var is actually baked in
+```
+
+Vercel prints your live URL (`https://<project>.vercel.app`) after the last command — that's
+your test link, works on any phone/laptop immediately, not just your WiFi. Then point the
+backend's CORS at it:
+
+```bash
+fly secrets set CORS_ORIGIN="https://<project>.vercel.app" -a <your-app-name>
+```
+
+### Option B: Cloudflare Pages
 
 1. Push this repo to GitHub if it isn't already connected (it is — you're on
    `claude/offline-first-auto-sync-j3xk0e`; merge it into your main branch first, or point
