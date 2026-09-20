@@ -1,132 +1,110 @@
 # Going live
 
-## Fastest way to test right now (2 minutes, no accounts)
+The backend now runs on Postgres (via `pg`) instead of a local SQLite file, so it has no
+local state to lose — which means it can run as a Vercel serverless function, and both
+halves of the app (`server/` and `web/`) can live on Vercel, with **Supabase** providing the
+free Postgres database. Everything below is free.
 
-Claude's sandbox for this session can't expose a public URL (outbound tunnels are blocked
-by policy), so I can't hand you a link directly. But you can get one on your own phone in
-about 2 minutes, using your laptop and home/office WiFi — no cloud account needed:
+## 0. Database is already set up
 
-```bash
-git pull   # get this branch on your laptop
-cd server && npm install && cp .env.example .env
-# edit .env: set JWT_SECRET to any random string
-npm run build && npm start &
+A Supabase project called **"Personal account"** already exists in your account (created
+today) and its schema (users/clients/works/transactions tables) has already been applied to
+it directly — nothing to do there. You only need its connection string:
 
-cd ../web && npm install && cp .env.example .env
-# edit .env: set VITE_API_BASE=http://<your-laptop's-LAN-IP>:4000
-npm run dev -- --host
-```
+1. Open [supabase.com/dashboard/project/cswbcfdiffbjfqrksegx/settings/database](https://supabase.com/dashboard/project/cswbcfdiffbjfqrksegx/settings/database)
+2. Under **Connection string**, choose the **Transaction pooler** tab (port 6543 — this is
+   the one safe for serverless, since it doesn't hold a dedicated Postgres connection open
+   per request the way a direct connection would).
+3. Copy it — it looks like
+   `postgresql://postgres.cswbcfdiffbjfqrksegx:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`
+4. Replace `[YOUR-PASSWORD]` with your database password. If you don't remember it, this same
+   page has a **Reset database password** button.
 
-Vite will print a "Network:" URL like `http://192.168.x.x:5173` — open that on your phone
-while it's on the **same WiFi** as your laptop. This is a real, fully working instance
-(same code, same offline/sync behavior) — just not reachable from outside your network, and
-it stops when you close the terminal. For something permanent with its own public link, do
-the Fly.io + Cloudflare Pages steps below (~10 more commands, one-time).
+That full string is your `DATABASE_URL` for every step below.
 
-## Permanent deployment
-
-Two pieces to deploy: the API (`server/`, needs a persistent disk for its SQLite file)
-and the PWA (`web/`, static files). Both are free.
-
-**Why not put the whole thing on Vercel?** Vercel's Node hosting is serverless functions —
-each request can run on a fresh instance with a wiped filesystem, so a SQLite file written
-there doesn't reliably survive between requests. Vercel is genuinely great for the frontend
-(static Vite build, free, instant global CDN) — just not for this backend as written. The
-fix that keeps it all on Vercel would be swapping SQLite for a hosted Postgres (e.g. free
-tier on Neon or Supabase) so the backend has no local file to lose; that's a real option
-later, but it's a code change, not just a deploy setting, so it's not in this file yet — say
-the word if you want that instead of Fly.io.
-
-Recommended for now: **Fly.io** for the API (free allowance includes a persistent volume)
-and **Vercel or Cloudflare Pages** for the frontend (free, global CDN, auto SSL). Render is a
-fine alternative for the API but its free tier's disk is *not* persistent — every redeploy
-wipes your data — so it's only listed as a fallback below.
-
-## 1. Backend on Fly.io
+## 1. Test locally first
 
 ```bash
-# one-time: install & log in
-curl -L https://fly.io/install.sh | sh
-fly auth login          # opens browser, creates a free account if needed
-
 cd server
-fly launch --no-deploy   # detects the Dockerfile, asks for an app name/region
-                          # say NO to "would you like a Postgres database" — we use SQLite
+cp .env.example .env
+# edit .env: set DATABASE_URL to the string from step 0, and JWT_SECRET to any random string
+npm install && npm run build && npm start
 ```
-
-This generates/updates `fly.toml` (a starter is already committed — just edit the `app`
-name, since Fly app names must be globally unique). Then:
-
-```bash
-fly volumes create legal_ledger_data --size 1   # 1GB persistent disk for the SQLite file
-
-fly secrets set \
-  JWT_SECRET="$(openssl rand -hex 32)" \
-  CORS_ORIGIN="https://<your-frontend-domain>"   # fill this in after step 2, or update later
-
-fly deploy
-```
-
-Your API is now live at `https://<your-app-name>.fly.dev`. Verify:
-
-```bash
-curl https://<your-app-name>.fly.dev/health
-```
-
-## 2. Frontend — Vercel (or Cloudflare Pages, either works)
-
-### Option A: Vercel
 
 ```bash
 cd web
-npx vercel login        # opens browser, free account
-npx vercel               # first run: link/create project, accept Vite defaults
-                          # (build command `npm run build`, output dir `dist`)
-npx vercel env add VITE_API_BASE production
-                          # paste: https://<your-app-name>.fly.dev
-npx vercel --prod         # rebuild so the env var is actually baked in
+cp .env.example .env
+# edit .env: VITE_API_BASE=http://localhost:4000
+npm install && npm run dev
 ```
 
-Vercel prints your live URL (`https://<project>.vercel.app`) after the last command — that's
-your test link, works on any phone/laptop immediately, not just your WiFi. Then point the
-backend's CORS at it:
+Open `http://localhost:5173`, create an account, add a client/transaction — this is now
+writing to your real Supabase project, so it's a genuine end-to-end test before deploying
+anywhere.
+
+## 2. Backend on Vercel
 
 ```bash
-fly secrets set CORS_ORIGIN="https://<project>.vercel.app" -a <your-app-name>
+cd server
+npx vercel login          # opens browser, free account
+npx vercel                # first run: link/create a project — it auto-detects
+                           # vercel.json + api/index.ts, no build config needed
+npx vercel env add DATABASE_URL production
+                           # paste the connection string from step 0
+npx vercel env add JWT_SECRET production
+                           # paste: openssl rand -hex 32
+npx vercel --prod
 ```
 
-### Option B: Cloudflare Pages
+Vercel prints your API URL (`https://<project>.vercel.app`). Verify:
 
-1. Push this repo to GitHub if it isn't already connected (it is — you're on
-   `claude/offline-first-auto-sync-j3xk0e`; merge it into your main branch first, or point
-   Pages at this branch directly for a preview).
-2. Go to the Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
-   **Connect to Git** → pick this repo.
-3. Build settings:
-   - **Root directory**: `web`
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-   - **Environment variable**: `VITE_API_BASE` = `https://<your-app-name>.fly.dev`
-4. Deploy. Cloudflare gives you a `https://<project>.pages.dev` URL immediately, and you
-   can attach a custom domain for free under the project's **Custom domains** tab.
-5. Go back to Fly and update the CORS origin to match:
-   ```bash
-   fly secrets set CORS_ORIGIN="https://<project>.pages.dev" -a <your-app-name>
-   ```
+```bash
+curl https://<your-api-project>.vercel.app/health
+```
 
-## 3. Try it live
+## 3. Frontend on Vercel
 
-Open the Pages URL, create an account, add a client/transaction, then toggle your
-phone/laptop to airplane mode and keep using the app — it keeps working. Reconnect and
-watch the sync badge in the top bar go from "N pending" to "Synced" with no action from you.
+```bash
+cd web
+npx vercel login
+npx vercel
+npx vercel env add VITE_API_BASE production
+                           # paste the backend URL from step 2
+npx vercel --prod          # rebuild — Vite env vars are baked in at build time
+```
 
-## Alternative: Render (simpler, but data doesn't persist across redeploys on the free tier)
+This prints your live app URL — open it on your phone, anywhere, not just your WiFi.
 
-- New **Web Service** → connect repo → root directory `server` → build command
-  `npm install && npm run build` → start command `npm start`.
-- Set env vars `JWT_SECRET`, `CORS_ORIGIN`, and leave `DB_PATH` as the default.
-- Fine for a demo/trial; upgrade to a paid plan with a persistent disk before storing real
-  client data, or switch to Fly.io as above.
+## 4. Connect them
+
+Point the backend's CORS at the frontend, then redeploy so it takes effect:
+
+```bash
+cd server
+npx vercel env add CORS_ORIGIN production
+                           # paste: https://<your-frontend-project>.vercel.app
+npx vercel --prod
+```
+
+## 5. Try it live
+
+Open the frontend URL, create an account, add a client/transaction, then toggle your
+phone/laptop to airplane mode and keep using the app — it keeps working. Reconnect and watch
+the sync badge in the top bar go from "N pending" to "Synced" with no action from you.
+
+## Alternative: Fly.io for the backend
+
+If you'd rather run the backend as a normal long-running server instead of serverless
+functions (e.g. to avoid Vercel's per-invocation timeout on very large sync batches), the
+same Postgres-backed code works there unchanged — `Dockerfile` and `fly.toml` are still in
+`server/`, just set `DATABASE_URL` the same way instead of a volume:
+
+```bash
+cd server
+fly launch --no-deploy
+fly secrets set DATABASE_URL="<connection string from step 0>" JWT_SECRET="$(openssl rand -hex 32)"
+fly deploy
+```
 
 ## Enabling "Sign in with Google"
 
@@ -137,17 +115,15 @@ The button stays hidden until you configure this — email/password keeps workin
 2. **Create credentials** → **OAuth client ID** → Application type **Web application**.
 3. Under **Authorized JavaScript origins**, add every URL you'll open the app from, e.g.:
    - `http://localhost:5173` (local dev)
-   - `http://<your-laptop-LAN-IP>:5173` (phone testing over WiFi, from the section above)
-   - `https://<project>.pages.dev` (once deployed)
-4. Copy the **Client ID** it gives you and set it in both places:
-   - `web/.env` → `VITE_GOOGLE_CLIENT_ID=<client id>` (also set this as a Cloudflare Pages
-     environment variable if deployed there)
-   - `server/.env` → `GOOGLE_CLIENT_ID=<client id>` (also `fly secrets set GOOGLE_CLIENT_ID=...`
-     if deployed to Fly)
-5. Rebuild/redeploy the frontend (env vars are baked in at build time) and restart the backend.
+   - `https://<your-frontend-project>.vercel.app` (once deployed)
+4. Copy the **Client ID** and set it in both places, then redeploy each:
+   - `web`: `npx vercel env add VITE_GOOGLE_CLIENT_ID production`, then `npx vercel --prod`
+   - `server`: `npx vercel env add GOOGLE_CLIENT_ID production`, then `npx vercel --prod`
 
 ## Notes
 
 - `JWT_SECRET` must be a long random string — never reuse the value from `.env.example`.
-- Back up the SQLite file periodically (`fly ssh sftp get /data/legal-ledger.db`) until a
-  managed Postgres migration is worth doing (see `PRD.md` §14 for that discussion).
+- The Supabase free tier pauses a project after a week of no API activity; the first request
+  after a pause takes a few extra seconds to wake it back up, which is otherwise invisible.
+- See `PRD.md` §14 for the multi-user/firm data model discussion, which becomes more relevant
+  now that the database is a real shared Postgres instance rather than a per-device file.

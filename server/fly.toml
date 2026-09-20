@@ -1,5 +1,7 @@
-# Template for `fly launch` / `fly deploy`. Rename `app` to something unique
-# before deploying — Fly app names are global.
+# Template for `fly launch` / `fly deploy` — optional alternative to
+# deploying the backend on Vercel. Rename `app` to something unique before
+# deploying — Fly app names are global. No volume/mount needed: all data
+# lives in Postgres (Supabase or otherwise) via DATABASE_URL.
 app = 'legal-ledger-api'
 primary_region = 'sin'
 
@@ -7,11 +9,6 @@ primary_region = 'sin'
 
 [env]
   PORT = '4000'
-  DB_PATH = '/data/legal-ledger.db'
-
-[[mounts]]
-  source = 'legal_ledger_data'
-  destination = '/data'
 
 [http_service]
   internal_port = 4000
