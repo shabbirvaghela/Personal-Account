@@ -59,8 +59,12 @@ async function applyOp(
   }
 
   const now = Date.now();
+  // FOR UPDATE takes a row lock so two concurrent pushes for the same entity
+  // (now genuinely concurrent, unlike the old single-connection SQLite writer)
+  // serialize on this row instead of both reading the same stale version and
+  // both passing the optimistic-concurrency check below.
   const existingResult = await client.query<{ version: number }>(
-    `SELECT version FROM ${table} WHERE id = $1 AND owner_id = $2`,
+    `SELECT version FROM ${table} WHERE id = $1 AND owner_id = $2 FOR UPDATE`,
     [op.entityId, ownerId]
   );
   const existing = existingResult.rows[0];
@@ -126,11 +130,17 @@ router.post("/push", ah(async (req: AuthedRequest, res) => {
     }
     await client.query("COMMIT");
   } catch (err) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore — connection is already broken; the original error below
+      // is what should surface, and release(err) drops this client
+      // instead of returning a possibly-poisoned one to the pool.
+    }
+    client.release(err instanceof Error ? err : undefined);
     throw err;
-  } finally {
-    client.release();
   }
+  client.release();
 
   res.json({ results });
 }));

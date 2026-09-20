@@ -61,7 +61,7 @@ export function PetrolExpensePage() {
       clientId,
       workId: null,
       type: "OUT",
-      amountPaise: toPaise(Math.round(cost)),
+      amountPaise: toPaise(cost),
       txnDate: Date.now(),
       mode: "cash",
       note: `Petrol: ${from} → ${to} (${distanceKm.toFixed(1)} km @ ₹${rate}/km)`,

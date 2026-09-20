@@ -22,16 +22,28 @@ class SyncEngine {
   private backoffMs = 5000;
   private readonly MAX_BACKOFF = 5 * 60 * 1000;
   private running = false;
+  private started = false;
+  private readonly onlineHandler = () => this.kick();
+  private readonly offlineHandler = () => this.emit();
 
   start() {
-    window.addEventListener("online", () => this.kick());
-    window.addEventListener("offline", () => this.emit());
+    if (this.started) return;
+    this.started = true;
+    window.addEventListener("online", this.onlineHandler);
+    window.addEventListener("offline", this.offlineHandler);
     this.timer = setInterval(() => this.kick(), 30_000);
     this.kick();
   }
 
   stop() {
-    if (this.timer) clearInterval(this.timer);
+    if (!this.started) return;
+    this.started = false;
+    window.removeEventListener("online", this.onlineHandler);
+    window.removeEventListener("offline", this.offlineHandler);
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
   subscribe(listener: SyncListener): () => void {

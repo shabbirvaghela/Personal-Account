@@ -30,7 +30,7 @@ export function QuickAddPanel({ clientId, workId, defaultMode = "cash", onSaved 
 
   async function saveAll() {
     if (!entries) return;
-    const toSave = entries.filter((e) => e.include);
+    const toSave = entries.filter((e) => e.include && e.amountPaise > 0);
     if (toSave.length === 0) return;
     setSaving(true);
     try {
@@ -53,9 +53,11 @@ export function QuickAddPanel({ clientId, workId, defaultMode = "cash", onSaved 
     }
   }
 
-  const includedCount = entries?.filter((e) => e.include).length ?? 0;
+  const includedCount = entries?.filter((e) => e.include && e.amountPaise > 0).length ?? 0;
   const netTotal = entries
-    ? entries.filter((e) => e.include).reduce((s, e) => s + (e.type === "IN" ? e.amountPaise : -e.amountPaise), 0)
+    ? entries
+        .filter((e) => e.include && e.amountPaise > 0)
+        .reduce((s, e) => s + (e.type === "IN" ? e.amountPaise : -e.amountPaise), 0)
     : 0;
 
   return (

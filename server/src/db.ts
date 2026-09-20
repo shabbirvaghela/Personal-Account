@@ -1,11 +1,14 @@
 import { Pool, types } from "pg";
 
-// pg returns BIGINT (OID 20) as strings by default, to avoid precision loss
-// for values beyond Number.MAX_SAFE_INTEGER. Our BIGINT columns are ms
-// timestamps and paise amounts — safely within that range for this app's
-// lifetime — and the frontend expects plain numbers in the JSON it already
-// works with, so decode them as numbers here instead of touching every caller.
+// pg returns BIGINT (OID 20) and NUMERIC (OID 1700, what SUM(bigint) produces)
+// as strings by default, to avoid precision loss for values beyond
+// Number.MAX_SAFE_INTEGER. Our BIGINT columns are ms timestamps and paise
+// amounts, and our SUM()s are totals over those same amounts — all safely
+// within that range for this app's lifetime — and the frontend expects plain
+// numbers in the JSON it already works with, so decode both as numbers here
+// instead of touching every caller.
 types.setTypeParser(20, (val: string) => parseInt(val, 10));
+types.setTypeParser(1700, (val: string) => parseFloat(val));
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {

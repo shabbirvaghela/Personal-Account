@@ -92,25 +92,24 @@ export async function createTransactionsBatch(
     syncStatus: "pending",
   }));
   await localDb.transactions.bulkPut(txns);
-  for (const txn of txns) {
-    await localDb.outbox.put({
-      opId: uuid(),
-      entity: "transaction",
-      entityId: txn.id,
-      op: "create",
-      payload: {
-        clientId: txn.clientId,
-        workId: txn.workId,
-        type: txn.type,
-        amountPaise: txn.amountPaise,
-        txnDate: txn.txnDate,
-        mode: txn.mode,
-        note: txn.note,
-      },
-      attempts: 0,
-      createdAt: ts,
-    });
-  }
+  const outboxOps = txns.map((txn) => ({
+    opId: uuid(),
+    entity: "transaction" as const,
+    entityId: txn.id,
+    op: "create" as const,
+    payload: {
+      clientId: txn.clientId,
+      workId: txn.workId,
+      type: txn.type,
+      amountPaise: txn.amountPaise,
+      txnDate: txn.txnDate,
+      mode: txn.mode,
+      note: txn.note,
+    },
+    attempts: 0,
+    createdAt: ts,
+  }));
+  await localDb.outbox.bulkPut(outboxOps);
   syncEngine.kick();
   return txns;
 }
