@@ -1,5 +1,30 @@
 # Going live
 
+## Fastest way to test right now (2 minutes, no accounts)
+
+Claude's sandbox for this session can't expose a public URL (outbound tunnels are blocked
+by policy), so I can't hand you a link directly. But you can get one on your own phone in
+about 2 minutes, using your laptop and home/office WiFi — no cloud account needed:
+
+```bash
+git pull   # get this branch on your laptop
+cd server && npm install && cp .env.example .env
+# edit .env: set JWT_SECRET to any random string
+npm run build && npm start &
+
+cd ../web && npm install && cp .env.example .env
+# edit .env: set VITE_API_BASE=http://<your-laptop's-LAN-IP>:4000
+npm run dev -- --host
+```
+
+Vite will print a "Network:" URL like `http://192.168.x.x:5173` — open that on your phone
+while it's on the **same WiFi** as your laptop. This is a real, fully working instance
+(same code, same offline/sync behavior) — just not reachable from outside your network, and
+it stops when you close the terminal. For something permanent with its own public link, do
+the Fly.io + Cloudflare Pages steps below (~10 more commands, one-time).
+
+## Permanent deployment
+
 Two pieces to deploy: the API (`server/`, needs a persistent disk for its SQLite file)
 and the PWA (`web/`, static files). Recommended: **Fly.io** for the API (free allowance
 includes a persistent volume) and **Cloudflare Pages** for the frontend (free, global CDN,
@@ -69,6 +94,24 @@ watch the sync badge in the top bar go from "N pending" to "Synced" with no acti
 - Set env vars `JWT_SECRET`, `CORS_ORIGIN`, and leave `DB_PATH` as the default.
 - Fine for a demo/trial; upgrade to a paid plan with a persistent disk before storing real
   client data, or switch to Fly.io as above.
+
+## Enabling "Sign in with Google"
+
+The button stays hidden until you configure this — email/password keeps working either way.
+
+1. Go to [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+   (create a project first if you don't have one).
+2. **Create credentials** → **OAuth client ID** → Application type **Web application**.
+3. Under **Authorized JavaScript origins**, add every URL you'll open the app from, e.g.:
+   - `http://localhost:5173` (local dev)
+   - `http://<your-laptop-LAN-IP>:5173` (phone testing over WiFi, from the section above)
+   - `https://<project>.pages.dev` (once deployed)
+4. Copy the **Client ID** it gives you and set it in both places:
+   - `web/.env` → `VITE_GOOGLE_CLIENT_ID=<client id>` (also set this as a Cloudflare Pages
+     environment variable if deployed there)
+   - `server/.env` → `GOOGLE_CLIENT_ID=<client id>` (also `fly secrets set GOOGLE_CLIENT_ID=...`
+     if deployed to Fly)
+5. Rebuild/redeploy the frontend (env vars are baked in at build time) and restart the backend.
 
 ## Notes
 
